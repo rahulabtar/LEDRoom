@@ -1,4 +1,4 @@
-from View.server import MyServer
+from server import MyServer
 from http.server import BaseHTTPRequestHandler, HTTPServer #allows server
 from strip import Strip
 import neopixel

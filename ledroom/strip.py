@@ -606,7 +606,8 @@ class Strip:
         print(palette)
         return palette
 
-stripex = Strip(board.D21,300,0.05)
+#stripex = Strip(board.D21,300,0.05)
+#stripex.clear_strip()
 #stripex.flow_effect()
 #stripex.twinkle_effect()
 #stripex.fill_color_effect()
@@ -616,8 +617,8 @@ stripex = Strip(board.D21,300,0.05)
 #stripex.sin_wave_effect() 
 #stripex.shooting_stars_effect() 
 #stripex.bouncing_ball_effect() 
-stripex.generate_color_palette((0,255,245),4)
-stripex.shimmer_effect()
+#stripex.generate_color_palette((0,255,245),4)
+#stripex.shimmer_effect()
 
 
 # stripex.get_more_colors((0,255,0))
