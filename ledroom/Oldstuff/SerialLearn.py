@@ -8,6 +8,11 @@ baud_rate = 9600
 print("started!")
 stripex = Strip(board.D21,50,0.05)
 
+# pattern color1 color2 color3 color4 brightness
+# flow Red Green None None 0.24
+#.split()
+# ['flow', 'Red, 'Green', 'NA', 'NA', '0.125']
+
 try:
     print("Got here")
     # Open the serial connection
