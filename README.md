@@ -9,5 +9,6 @@ The SerialCom class is the raspberry pi end of the communication with the raspbe
 
 All the classes for the arduino are in the LEDRoom.ino file. 
 
+The folder labeled "Old Stuff" contains prototype code for an HTTPs server user interface that we orginally planned to use and other code to help us learn and experiment. We decided to not use a web server interface due to dorm wifi security issues. 
 
 Videos of the lights and controller in action soon!
