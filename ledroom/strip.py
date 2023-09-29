@@ -2,11 +2,6 @@ import time
 import board
 import neopixel
 import random
-from astral.sun import sun
-from astral import LocationInfo 
-from datetime import datetime
-from pytz import timezone
-import logging
 import math
 import threading
 import numpy as np
@@ -16,9 +11,6 @@ import colorsys
 #utilised and the amount of LED Nodes on strip and brightness (0 to 1 value)
 
 class Strip:
-    BRIGHTNESS = 0.05 #scale of 0-1
-    LONGITUDE = -71.086080 #longitude and latitude of location of led strip
-    LATTITUDE = 42.337020
     #A dict with all the colors in it, color name key, value decimal rgb
     COLOR_DICT = {
     "Black": (0,0,0),
@@ -110,10 +102,11 @@ class Strip:
     "Pale_Violet_Red": (219, 112, 147),
     "Deep_Pink": (255, 20, 147),
     "Hot_Pink": (255, 105, 180),
-    "White" : (255,255,255)
+    "White" : (255,255,255),
+    "NA" : "NA"
 }
 
-    def __init__(self,boardpin:board,num_leds:int,brightness=BRIGHTNESS) -> None:
+    def __init__(self,boardpin:board,num_leds:int,brightness=0.05) -> None:
         self.num_leds = num_leds
         self.brightness = brightness
         self.pixels = neopixel.NeoPixel(boardpin, num_leds, brightness=0.05) #has attribute autofill.
@@ -370,49 +363,6 @@ class Strip:
                 colorIndex[i] = (colorIndex[i] + 1) % len(palette)
         
             self.pixels.show()
-
-    def day_time_lighting_effect(self):
-        self.clear_strip()
-        self.flag = 'Day_Time'
-        location_timezone = timezone("America/New_York")  # Replace with the appropriate timezone
-
-        def calculate_color_for_time(hour): #calcs color depending on time in minutes
-            if 5 * 60 <= hour < 9 * 60:
-                return (255, 150, 50)  # Morning color
-            elif 9 * 60 <= hour < 18  * 60:
-                return (255, 255, 255)  # Day color
-            elif 18  * 60 <= hour < 21  * 60:
-                return (150, 50, 0)    # Evening color
-            else:
-                return (25, 0, 150)     # Night color
-            
-
-        while self.flag == 'Day_Time':
-            # Calculate sunrise and sunset times
-            city = LocationInfo("Boston", "Massachusetts", self.LATTITUDE, self.LONGITUDE)
-            s = sun(city.observer, date=datetime.now())
-            sunrise_min = s["sunrise"].hour * 60 + s["sunrise"].minute
-            print("sunrise hour:", sunrise_min/60) 
-            sunset_min = s["sunset"].hour * 60 + s["sunrise"].minute
-            print("sunset hour",sunset_min/60)
-
-            # Get the current hour
-            now = datetime.now(location_timezone)
-            current_min = now.hour * 60 + now.minute
-
-            print("currhour:",current_min/60)
-
-            # Calculate LED color based on time of day
-            if sunrise_min <= current_min < sunset_min:
-                current_color = calculate_color_for_time(current_min)
-            else:
-                self.brightness = 0.05
-                current_color = (255, 80, 0)  # Turn LEDs amber during the night
-
-            self.pixels.fill(current_color)
-            self.pixels.show()
-
-            time.sleep(60)  # Update LEDs every minute
     
     def bouncing_ball_effect(self, color=(0, 0, 255), gravity=1, initial_velocity=5):
         self.pixels.auto_write = False

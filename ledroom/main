@@ -1,0 +1,16 @@
+from serial_com import SerialCommunication
+from strip import Strip
+from controller import ProgramController
+import board
+import serial 
+
+port = '/dev/ttyUSB0'  # Change this to the correct serial port for your device
+baud_rate = 9600 
+
+ser = serial.Serial(port, baud_rate, timeout = 3)
+
+strip1 = Strip(board.D21,300,0.05)
+model = SerialCommunication(strip1,ser)
+controller = ProgramController(model,strip1)
+controller.run_program()
+
