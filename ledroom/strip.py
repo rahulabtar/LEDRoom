@@ -109,19 +109,20 @@ class Strip:
     def __init__(self,boardpin:board,num_leds:int,brightness=0.05) -> None:
         self.num_leds = num_leds
         self.brightness = brightness
-        self.pixels = neopixel.NeoPixel(boardpin, num_leds, brightness=0.05) #has attribute autofill.
+        self.pixels = neopixel.NeoPixel(boardpin, num_leds, brightness=0.05,auto_write=False) #has attribute autofill.
         self.flag = 'Off' #The flag helps with switching between modes and threading
+        self.trans_flag = False
         self.effects = {
-            'twinkle': self.twinkle_effect,
-            'flow': self.flow_effect,
-            'dual_cat': self.dual_catapillars_effect,
-            'rainbow_anim': self.rainbow_animation_effect,
+            "Twinkle": self.twinkle_effect,
+            'Flow': self.flow_effect,
+            "Dual_Cats": self.dual_catapillars_effect,
+            'Rainbow_Animation': self.rainbow_animation_effect,
             'pulse': self.pulse_effect,
-            'sin_wave': self.sin_wave_effect,
-            'shimmer': self.shimmer_effect,
-            'ball': self.bouncing_ball_effect,
-            'stars': self.shooting_stars_effect,
-            'fire': self.fire_effect,
+            "sin_wave": self.sin_wave_effect,
+            "shimmer": self.shimmer_effect,
+            "bouncing_ball": self.bouncing_ball_effect,
+            "shooting_stars": self.shooting_stars_effect,
+            "fire": self.fire_effect,
         }
 
     def get_brightness(self):
@@ -132,38 +133,43 @@ class Strip:
         self.pixels.brightness = self.brightness
     
     def run_effect(self, effect_name, wait=20):
-        while True:
+        print("got hree")
+        while self.trans_flag == True:
             print(f'Effect {effect_name}')
             selected_effect = random.choice(list(self.effects.keys()))
             print(selected_effect)
+            self.flag = selected_effect
+            print(self.trans_flag)
 
-            effect_thread = threading.Thread(target=self.effects[selected_effect])
-            effect_thread.start()
+            effect_thread_trans = threading.Thread(target=self.effects[selected_effect])
+            effect_thread_trans.start()
 
             # Wait for the specified duration before transitioning
             time.sleep(wait)
 
             # Stop the effect based on the selected effect
-            self.flag = 'Stop'  # You might need to implement a stopping mechanism in your effect methods
-            effect_thread.join()  # Wait for the effect_thread to finish
+            #self.flag = 'Stop'  # You might need to implement a stopping mechanism in your effect methods
+            effect_thread_trans.join()  # Wait for the effect_thread to finish
+        print("exited transition loop")
 
     def transition_effects(self, wait=20):
-        while True:
+        while self.trans_flag == True:
             for effect_number in range(2):
                 effect_name = f'effect{effect_number + 1}'
                 self.run_effect(effect_name, wait)
+                if self.trans_flag != True:
+                    break
 
     def get_pixel_color(self,PIXEL_INDEX):
         # Retrieve the RGB decimal value of the specified pixel
         pixel_color = self.pixels[PIXEL_INDEX]
         r, g, b = pixel_color
 
-    def twinkle_effect(self, color1='Red', color2='Yellow', color3='White', color4='Orange', FADE=10, FADE_SPEED = 0.2, TWINKLE_SPEED=0.03):
+    def twinkle_effect(self, color1=(255,0,0), color2=(0,150,150), color3=(255,255,255), color4=(200,100,0), FADE=10, FADE_SPEED = 0.2, TWINKLE_SPEED=0.03):
         """This effect takes in 4 colors and has them randomly twinkle and fade away along the strip"""
-        self.flag = 'Twinkle'
         self.pixels.auto_write = False
 
-        palette = [self.COLOR_DICT[color1], self.COLOR_DICT[color2], self.COLOR_DICT[color3], self.COLOR_DICT[color4]]
+        palette = [color1,color2,color3, color4]
 
         def fade_to_black_thread():
             while self.flag == 'Twinkle':
@@ -180,13 +186,12 @@ class Strip:
 
         fade_thread.join()  # Wait for the fading thread to finish
 
-    def flow_effect(self,color1 = 'Red', color2 = 'Violet',wait=1):
+    def flow_effect(self,color1 = (255,0,0), color2 = (0,0,255), wait=1):
         """This effect takes in two colors and alternates them along the strip. Auto_write is off to allow smooth loading and showing.
         The odd and even position colors are switched to give the illusion of a flowing light"""
         self.pixels.auto_write = False
         self.clear_strip()
-        self.flag = 'Flow'
-        colors = [self.COLOR_DICT[color1],self.COLOR_DICT[color2]]
+        colors = [color1,color2]
 
         while self.flag == 'Flow':
             self.get_pixel_color(5)
@@ -200,16 +205,15 @@ class Strip:
             # Swap colors for the next iteration
             colors[0], colors[1] = colors[1], colors[0]
 
-    def fill_color_effect(self,color='Orange'):
+    def fill_color_effect(self,color=(50,160,50)):
         """ Fills Color"""
         self.clear_strip()
-        self.pixels.fill(self.COLOR_DICT[color])
+        self.pixels.fill(color)
     
-    def dual_catapillars_effect(self,color1='Red',color2='Blue',trail1 = 'Yellow', trail2 = 'Green',SLEEP = 0, SPEED = 0.025, FADE = 20, CAT_SIZE = 8,):
+    def dual_catapillars_effect(self,color1=(255,0,0),color2=(0,0,255),trail1 = (0,100,100), trail2 = (0,0,255),SLEEP = 0, SPEED = 0.025, FADE = 20, CAT_SIZE = 8,):
         """This effect takes in 4 colors. The first two are the colors of the moving blocks or catapillars. The second two are the colors of the trails they leave behind. The catapillars bounce at the opposite end of the strip then they started at, and disappear once they 
         reach the end of the strip they started at. CAT_SIZE can be adjusted to affect how big they are. Speed can change how fast they travel (lower faster), FADE is how much trail fades, SLEEP is how long strip is black between cycles (zero for none)"""
         self.clear_strip()
-        self.flag = 'Dual_Cats'
         self.pixels.auto_write = False
 
         NUM_LEDS = self.num_leds
@@ -234,16 +238,15 @@ class Strip:
 
         # Loop through the travel effect with different colors
         while self.flag == 'Dual_Cats':
-            travel_effect(NUM_LEDS-CAT_SIZE, self.COLOR_DICT[color1],self.COLOR_DICT[color2],self.COLOR_DICT[trail1],self.COLOR_DICT[trail2])
+            travel_effect(NUM_LEDS-CAT_SIZE,color1,color2,trail1,trail2)
             self.pixels.fill((0,0,0))
-            travel_effect(NUM_LEDS-CAT_SIZE, self.COLOR_DICT[color2],self.COLOR_DICT[color1],self.COLOR_DICT[trail2],self.COLOR_DICT[trail1])
+            travel_effect(NUM_LEDS-CAT_SIZE, color2,color1,trail2,trail1)
             self.pixels.fill((0,0,0))
             time.sleep(SLEEP)
 
     def rainbow_animation_effect(self,wait=0.01,mult=3):
         """Shows a slow traveling rainbow, wait and mult help decide how fast travels. Mult still kinda broken so don't touch"""
         self.clear_strip()
-        self.flag = 'Rainbow_Animation'
         NUM_LEDS = self.num_leds
         self.pixels.auto_write = False
 
@@ -255,9 +258,7 @@ class Strip:
                 time.sleep(wait)
                 self.pixels.show()
 
-    def pulse_effect(self, color1='Red', color2='Green', color3='Blue', wait=0.01):
-        self.flag = 'pulse'
-        color1, color2, color3 = self.COLOR_DICT[color1], self.COLOR_DICT[color2], self.COLOR_DICT[color3]
+    def pulse_effect(self, color1=(255,0,0), color2=(0,255,0), color3=(0,0,255), wait=0.01):
         black = (0,0,0)
         self.pixels.auto_write = False
         def black():
@@ -277,11 +278,9 @@ class Strip:
             black()
             fadecol(color3)
 
-    def sin_wave_effect(self,color1='Red', color2 = 'Orange', color3 = 'Yellow', color4 = 'Coral'):
-        color1, color2, color3, color4 = self.COLOR_DICT[color1], self.COLOR_DICT[color2], self.COLOR_DICT[color3], self.COLOR_DICT[color4]
+    def sin_wave_effect(self,color1= (255,0,0), color2 = (150,150,0), color3 = (255,255,255), color4 = (0,150,150)):
         colors = [color1,color2,color3,color4]
         self.clear_strip()
-        self.flag = 'sin_wave'
         self.pixels.auto_write = False
 
         def fade_to_black_thread():
@@ -324,7 +323,6 @@ class Strip:
 
     def shimmer_effect(self,color=(0,255,0)):
         self.pixels.auto_write = False
-        self.flag = 'shimmer'
         def ColorFromPalette(palette, index, brightness):
             color = palette[index % len(palette)] 
             return (
@@ -366,9 +364,8 @@ class Strip:
     
     def bouncing_ball_effect(self, color=(0, 0, 255), gravity=1, initial_velocity=5):
         self.pixels.auto_write = False
-        self.flag = 'bouncing_ball'
         def fade_to_black_thread():
-            while True:
+            while self.flag == "bouncing_ball":
                 self.fade_to_black(20)
                 time.sleep(0.01)
 
@@ -421,8 +418,6 @@ class Strip:
 
     def shooting_stars_effect(self, base_color=(0, 0, 255)):
         self.pixels.auto_write = False
-        self.flag = 'shooting_stars'
-
         def fade_to_black_thread():
             while self.flag=='shooting_stars':
                 self.fade_to_black(20)
@@ -455,7 +450,6 @@ class Strip:
         cooling = 50
         sparking = 240
         heat = [0] * NUM_LEDS
-        self.flag = 'fire'
 
         def fire_loop():
             # Step 1: Cool down every cell a little
@@ -558,7 +552,6 @@ class Strip:
 
     def clear_strip(self):
         """This method clears the strip and the flag to allow transitions between affects"""
-        self.flag = 'Clear'
         self.pixels.fill((0,0,0))
 
     def get_more_colors(self,input_color):
@@ -595,10 +588,10 @@ class Strip:
             palette.append(rgb_color)
 
         return palette
+#stripex = Strip(board.D21,10,0.05)
 
-#stripex = Strip(board.D21,300,0.05)
 #stripex.transition_effects()
-#stripex.flow_effect()
+
 #stripex.blend_effects()
 #stripex.clear_strip()
 #stripex.twinkle_effect()

@@ -3,4 +3,5 @@ import board
 
 
 stripex = Strip(board.D21,300,0.05)
-stripex.transition_effects()
+stripex.trans_flag == True
+stripex.flow_effect()
