@@ -1,13 +1,5 @@
-#include <Arduino.h>
+// #include <Arduino.h>
 #include <LiquidCrystal.h> //LCD Screen library
-
-// class string of
-// string concatination, Send data so everything is separated by a space.
-// CLass to get data, Class to send data. Data send = String of data with order,
-// pattern color color color brightness (float 0-1)
-// Make sure send pattern color1 color2 color3 color4 brightness. Send NA if no color.
-
-// Have request timeout / request recieved if it works.
 
 // Global Variable Instantiation
 // Pins
@@ -17,14 +9,15 @@ LiquidCrystal lcd(7, 6, 5, 4, 3, 2); // LCD screen pins
 #define potPin2 A1
 
 // Variables
-bool isRunning = false;                               // flag to indicate if the program is running.
-int pattIndex = -1;                                   // invalid index to force initial update
-int colorIndex = -1;                                  // invalid index to force initial update
-int colorsNeeded = 0;                                 // invalid index to force initial update
-int selectedColorCount = 0;                           // invalid index to force initial update
-bool userFinished = false;                            // flag to indicate if the user has finished selecting colors
-unsigned long lastBrightnessChangeTime = 0;           // Time when the brightness was last changed. Unsigned longs are often used for "time" variables as they are long and can't be negative
-const unsigned long brightnessDisplayDuration = 5000; // Display brightness screen for 5 seconds after the last potentiometer change
+int pattIndex = -1; // invalid indexes to force an update on the first loop
+int colorIndex = -1;
+int colorsNeeded = -1;
+int selectedColorCount = -1;
+static int lastSentBrightness = -1;
+bool userFinished = false;                  // used for readability in the main loop to indicate if the user has finished selecting colors
+bool sendBrightnessFlag = false;            // only send brightness once per change
+unsigned long lastBrightnessChangeTime = 0; // Time when the brightness was last changed. Unsigned longs are often used for "time" variables as they are long and can't be negative
+const unsigned long brightnessDisplayDuration = 2500;
 String patternName;
 String colorName1;
 String colorName2;
@@ -32,32 +25,31 @@ String colorName3;
 String colorName4;
 
 // LED patterns and amount of colors needed for each pattern
-const char patterns[][20] PROGMEM = { // array of pointers to strings meaning each element of the array is a pointer to a string. This is useful to save memory and is a common way to store strings in C/C++
-    "Clear Strip", "TransitionEffect", "Flow Effect", "Twinkle Effect", "Fill Color Effect",
+const char patterns[][20] PROGMEM = { // array of pointers to strings meaning each element of the array is a pointer to a string. PROGMEM stores the strings in flash memory instead of SRAM to save memory
+    "Off", "Transition", "Flow", "Twinkle", "Fill Color",
     "Dual Catapillars", "Rainbow", "Pulse", "Sin Wave", "Shooting Stars", "Bouncing Ball", "Shimmer", "Fire"};
 
-const char sendPatternNames[][20] PROGMEM = { // array of pointers to strings meaning each element of the array is a pointer to a string. This is useful to save memory and is a common way to store strings in C/C++
+const char sendPatternNames[][20] PROGMEM = { // Pattern names sent to the Serial Monitor formatted for the Raspberry Pi to read
     "Clear_Strip", "Transition_Effect", "Flow_Effect", "Twinkle_Effect", "Fill_Color_Effect",
     "Dual_Catapillars", "Rainbow", "Pulse", "Sin_Wave", "Shooting_Stars", "Bouncing_Ball", "Shimmer", "Fire"};
 
-const byte colorCounts[] = {
-    // array of bytes. Used bytes for small numbers to save memory
-    0, // Clear Strip
-    0, // Transition Effectd
-    2, // Flow Effect
-    4, // Twinkle Effect
-    1, // Fill Color Effect
+const byte colorCounts[] = { // array of bytes. Used bytes for small numbers to save memory
+    0, // Off
+    0, // Transition
+    2, // Flow
+    4, // Twinkle
+    1, // Fill Color
     4, // Dual Catapillars
     0, // Rainbow
     3, // Pulse
-    3, // Sin Wave
+    4, // Sin Wave
     1, // Shooting Stars
     1, // Bouncing Ball
-    4, // Shimmer
+    1, // Shimmer
     1  // Fire
 };
 
-// Color names and RGB values for each color
+// Color names 
 const char colorNames[][20] PROGMEM = {
     "Black", "Maroon", "Dark Red", "Brown", "Firebrick", "Crimson", "Red", "Tomato", "Coral", "Indian Red", "Light Coral", "Dark Salmon",
     "Salmon", "Light Salmon", "Orange Red", "Dark Orange", "Orange", "Gold", "Dark Golden Rod", "Golden Rod", "Pale Golden Rod", "Dark Khaki", "Khaki",
@@ -70,8 +62,7 @@ const char colorNames[][20] PROGMEM = {
     "Dark Slate Blue", "Slate Blue", "Medium Slate Blue", "Medium Purple", "Dark Magenta", "Dark Violet", "Dark Orchid", "Medium Orchid",
     "Thistle", "Plum", "Violet", "Orchid", "Medium Violet Red", "Pale Violet Red", "Deep Pink", "Hot Pink", "White"};
 
-// Color names and RGB values for each color
-const char sendColorNames[][20] PROGMEM = {
+const char sendColorNames[][20] PROGMEM = { // Color names sent to the Serial Monitor formatted for the Raspberry Pi to read
     "Black", "Maroon", "Dark_Red", "Brown", "Firebrick", "Crimson", "Red", "Tomato", "Coral", "Indian_Red", "Light_Coral", "Dark_Salmon",
     "Salmon", "Light_Salmon", "Orange_Red", "Dark_Orange", "Orange", "Gold", "Dark_Golden_Rod", "Golden_Rod", "Pale_Golden_Rod", "Dark_Khaki", "Khaki",
     "Olive", "Yellow", "Yellow_Green", "Dark_Olive_Green", "Olive_Drab", "Lawn_Green", "Chartreuse", "Green_Yellow", "Dark_Green", "Green",
@@ -82,31 +73,31 @@ const char sendColorNames[][20] PROGMEM = {
     "Midnight_Blue", "Navy", "Dark_Blue", "Medium_Blue", "Blue", "Royal_Blue", "Blue_Violet", "Indigo",
     "Dark_Slate_Blue", "Slate_Blue", "Medium_Slate_Blue", "Medium_Purple", "Dark_Magenta", "Dark_Violet", "Dark_Orchid", "Medium_Orchid",
     "Thistle", "Plum", "Violet", "Orchid", "Medium_Violet_Red", "Pale_Violet_Red", "Deep_Pink", "Hot_Pink", "White"};
-
-class ArduinoUserDis
+ 
+class ArduinoUserDis // Class handles all user display functions and variables
 {
 public:
-    int brightness; // Brightness of the LED strip
+    int brightness; 
 
-    bool isButtonPressed() // Function to check if the button is pressed which accounts for debouncing and button hold
+    bool isButtonPressed() // Function accounts for button press debouncing and button hold
     {
         static bool buttonWasPressed = false; // Static variables are only initialized once and keep their values between function calls
-        static bool buttonState = false;      // these two variables are to account for if the button is pressed between function calls (debouncing/button hold)
-        int currentButtonState = digitalRead(buttPin);
+        static bool buttonState = false;      // These two variables are to account for if the button is pressed between function calls (debouncing/button hold)
+        int currentButtonState = digitalRead(buttPin); 
 
-        if (currentButtonState != buttonState) // If the button state has changed, was it pressed, was it released
+        if (currentButtonState != buttonState) // Returns true when the button is pressed, false at any other time
         {
-            buttonState = currentButtonState; // Update the button state
-            if (currentButtonState == HIGH)   // Button was released
+            buttonState = currentButtonState; 
+            if (currentButtonState == HIGH)   // Button was released, reset the buttonWasPressed variable so the button can be pressed again
             {
                 buttonWasPressed = false;
             }
             else // Button was pressed
             {
-                if (!buttonWasPressed)
+                if (!buttonWasPressed) // If the button was not already pressed, return true. Accounts for button hold
                 {
                     buttonWasPressed = true;
-                    return true; // return true when the button is pressed
+                    return true; 
                 }
             }
         }
@@ -114,18 +105,20 @@ public:
         return false; // return false if the button was already pressed (debouncing/hold) or if the button was not pressed
     }
 
-    void brightDis() // Function to display the brightness on the LCD screen
+    void brightDis() // Function displays the brightness screen
     {
+        int potVal = analogRead(potPin1);
+        
         lcd.setCursor(3, 0);
         lcd.print("Brightness");
-        int potVal = analogRead(potPin1);
         brightness = map(potVal, 0, 1023, 0, 100); // Map the potentiometer value 0-1023 to brightness 0-100
-        if (brightness < 10)                       // If the brightness is less than 10, print an extra space to keep the numbers aligned
+        // Center the text in the second line (16 characters wide LCD), printing a space to overwrite the previous value and keep the numbers aligned
+        if (brightness < 10)                       
         {
             lcd.setCursor(8, 1);
             lcd.print("  ");
         }
-        else if (brightness < 100) // If the brightness is less than 100, print an extra space to keep the numbers aligned
+        else if (brightness < 100) 
         {
             lcd.setCursor(9, 1);
             lcd.print(" ");
@@ -134,63 +127,62 @@ public:
         lcd.print(brightness);
     }
 
-    void pattDis(int newPotVal)
+    void pattDis(int newPotVal) // Function displays the pattern screen. The newPotVal parameter is the current potentiometer value
     {
         int newPattIndex = map(newPotVal, 0, 1023, 0, sizeof(patterns) / sizeof(patterns[0]) - 1); // Map the potentiometer value 0-1023 to pattern index 0-15 (16 patterns). Math so if more patterns are added the code doesn't need to be changed
 
         // Only update the display if the pattern has changed to prevent flickering.
         if (newPattIndex != pattIndex) // First time through this will always be true because pattIndex is initialized to -1
         {
-            pattIndex = newPattIndex; // Update the pattern index
+            pattIndex = newPattIndex; 
             lcd.clear();
         }
+        
         lcd.setCursor(4, 0);
         lcd.print(F("Pattern"));
-
         // Center the text in the second line (16 characters wide LCD)
         int patternLength = strlen_P(patterns[newPattIndex]);
         int padding = (16 - patternLength) / 2;
-
         lcd.setCursor(padding, 1);
         lcd.print(reinterpret_cast<const __FlashStringHelper *>(patterns[newPattIndex]));
     }
 
-    void colorDis(int newPotVal, int colorsNeeded)
+    void colorDis(int newPotVal, int colorsNeeded) // Function displays the color screen. The colorsNeeded parameter is used to determine how many colors the user needs to select for the current pattern
     {
-        int newColorIndex = map(newPotVal, 0, 1023, 0, sizeof(colorNames) / sizeof(colorNames[0]) - 1); // Map the potentiometer value 0-1023 to color index 0-99 (100 colors). Math so if more colors are added the code doesn't need to be changed
+        int newColorIndex = map(newPotVal, 0, 1023, 0, sizeof(colorNames) / sizeof(colorNames[0]) - 1); // Map the potentiometer value 0-1023 to color index 0-99 (100 colors)
 
         // Only update the display if the color has changed to prevent flickering.
-        if (newColorIndex != colorIndex) // First time through this will always be true because colorIndex is initialized to -1
+        if (newColorIndex != colorIndex) 
         {
-            colorIndex = newColorIndex; // Update the color index
+            colorIndex = newColorIndex; 
             lcd.clear();
         }
         lcd.setCursor(0, 0);
         lcd.print(F("Choose Color "));
-        lcd.print(selectedColorCount + 1); // Display the selected color count
+        lcd.print(selectedColorCount + 1);
         lcd.print("/");
-        lcd.print(colorCounts[pattIndex]); // Display the total color count for the pattern
+        lcd.print(colorCounts[pattIndex]); // Display the total color count required for the pattern
 
         // Center the text in the second line (16 characters wide LCD)
         int colorLength = strlen_P(colorNames[newColorIndex]);
         int padding = (16 - colorLength) / 2;
-
         lcd.setCursor(padding, 1);
         lcd.print(reinterpret_cast<const __FlashStringHelper *>(colorNames[newColorIndex]));
     }
 };
 
-class UserData
+class UserData // Class handles all user input data and variables which are sent to the Raspberry Pi via the Serial Monitor
 {
 public:
+    // Variables containing the data to be sent to the Raspberry Pi which needs string variables
     String brightnessSend;
-    String patternSend; // Change the data type to String
+    String patternSend; 
     String colorSend1;
     String colorSend2;
     String colorSend3;
     String colorSend4;
 
-    void updateData(String newBrightness, String patternName, String colorName1, String colorName2, String colorName3, String colorName4)
+    void updateData(String newBrightness, String patternName, String colorName1, String colorName2, String colorName3, String colorName4) // Function updates the data to be sent to the Raspberry Pi
     {
         brightnessSend = newBrightness;
         patternSend = patternName;
@@ -200,32 +192,32 @@ public:
         colorSend4 = colorName4;
     }
 
-    void printUserData()
+    void sendPattern() // Function sends the pattern and its colors to the Raspberry Pi via the Serial Monitor
     {
-        Serial.print(F("Pattern "));
-        Serial.print(patternSend); // Print the pattern name
+        Serial.print(F("Pattern ")); // Raspberry Pi will look for this string to know when to read the pattern and color names
+        Serial.print(patternSend); 
         Serial.print(F(" "));
-        Serial.print(colorSend1); // Print the first color name
+        Serial.print(colorSend1); 
         Serial.print(F(" "));
-        Serial.print(colorSend2); // Print the second color name
+        Serial.print(colorSend2); 
         Serial.print(F(" "));
-        Serial.print(colorSend3); // Print the third color name
+        Serial.print(colorSend3); 
         Serial.print(F(" "));
-        Serial.println(colorSend4); // Print the fourth color name
+        Serial.println(colorSend4); 
     }
 
-    void printBright()
+    void sendBright() // Function sends the brightness to the Rasberry Pi via the Serial Monitor
     {
         Serial.print(F("Brightness "));
-
-        Serial.println(brightnessSend); // Print the brightness
+        Serial.println(brightnessSend); 
     }
 };
 
-ArduinoUserDis myUserDis; // Declare an instance of the LEDStrip class
-UserData myUserData;      // Declare an instance of the UserData class
+// Declare instances of the classes
+ArduinoUserDis myUserDis; 
+UserData myUserData;      
 
-enum State // Enumeration to keep track of the current state of the program
+enum State // Enumeration for readability in the main loop to indicate the current state
 {
     OFF,
     PATTERN,
@@ -236,51 +228,53 @@ State currentState = OFF; // Initialize the current state to OFF
 
 void setup()
 {
-    pinMode(buttPin, INPUT_PULLUP);
-    lcd.begin(16, 2);
-    Serial.begin(9600); // Initialize serial communication at 9600 baud
+    pinMode(buttPin, INPUT_PULLUP); 
+    lcd.begin(16, 2); // Initialize the LCD screen with 16 columns and 2 rows
+    Serial.begin(9600); 
 }
 
 void loop()
 {
     int potVal1 = analogRead(potPin1);
     int brightness = map(potVal1, 0, 1023, 0, 100);
-    float bright01;
-
     static int lastBrightness = -1;
+    float brightConvert; // Used to convert brightness to a float
+    String brightnessString;
 
     switch (currentState)
     {
-    case OFF:
-        if (abs(brightness - myUserDis.brightness) > 5)
-        {
-            lastBrightnessChangeTime = millis(); // Update the last change time
-            myUserDis.brightness = brightness;
-        }
-        if (myUserDis.isButtonPressed())
+    case OFF: // Runs when the user is not selecting patterns or colors and the LCD screen is off
+        if (myUserDis.isButtonPressed()) // If the button is pressed, change the state to PATTERN and start the user input process
         {
             lcd.clear();
             currentState = PATTERN;
             delay(200); // debounce
         }
 
+        if (abs(brightness - myUserDis.brightness) > 2) // accounts for slight voltage variation in the potentiometer and will update lastBrightnessChangeTime if the brightness changes
+        {
+            lastBrightnessChangeTime = millis(); // Update the last change time
+            myUserDis.brightness = brightness;
+        }
         if (millis() - lastBrightnessChangeTime < brightnessDisplayDuration) // If the time since the last brightness change is less than the brightness display duration
         {
-            myUserDis.brightDis(); // Display brightness screen for 3 seconds after the last potentiometer change
+            myUserDis.brightDis(); 
+            sendBrightnessFlag = true; 
         }
-        else if (brightness != lastBrightness)
+        else if (brightness != lastBrightness) 
         {
-            // Only send data when brightness changes
-            lastBrightness = brightness;
-            UserData userData;
-            bright01 = map(brightness, 0, 100, 0, 500) / 10000.0;
-            String brightnessString = String(bright01, 4);
-            userData.updateData(brightnessString, patternName, colorName1, colorName2, colorName3, colorName4);
-            lcd.setCursor(0, 0);
-            lcd.print("Bright changed!");
-            delay(2000);
             lcd.clear();
-            userData.printBright();
+            if (abs(brightness - lastSentBrightness) > 2 && sendBrightnessFlag) // If the brightness changed more than 2 and it has not been sent since the last change
+            {
+                lastBrightness = brightness;
+                brightConvert = map(brightness, 0, 100, 0, 500) / 10000.; // Converts the 0-100 brightness to a float 0-0.05
+                brightnessString = String(brightConvert, 3);
+                myUserData.updateData(brightnessString, patternName, colorName1, colorName2, colorName3, colorName4);
+                lcd.clear();
+                myUserData.sendBright();
+                lastSentBrightness = brightness;
+                sendBrightnessFlag = false; // Reset the sendBrightnessFlag so the brightness can be sent again
+            }
         }
         else
         {
@@ -288,74 +282,64 @@ void loop()
         }
         break;
 
-    case PATTERN:
-        myUserDis.pattDis(analogRead(potPin2));
+    case PATTERN: // Runs when the user is selecting a pattern
+        myUserDis.pattDis(analogRead(potPin2)); 
         if (myUserDis.isButtonPressed())
         {
-            //  Get string variable of pattern name
-            patternName = reinterpret_cast<const __FlashStringHelper *>(sendPatternNames[pattIndex]);
+            patternName = reinterpret_cast<const __FlashStringHelper *>(sendPatternNames[pattIndex]); // Get the pattern name string
             selectedColorCount = 0; // Reset the selected color count for the new pattern in the next state
             currentState = COLOR;
             delay(200); // Debounce
+            lcd.clear();
         }
         break;
 
-    case COLOR:
-        // If all colors are selected, turn off the program
-        if (selectedColorCount >= colorCounts[pattIndex])
+    case COLOR: // Runs when the user is selecting colors
+        if (selectedColorCount >= colorCounts[pattIndex]) // If all colors for the pattern are selected, turn off the program and send the data to the Raspberry Pi
         {
+            // Resets unused colorName variables to "NA" if the user did not select all 4 colors
+            if (selectedColorCount >= 0 && selectedColorCount <= 3)
+            {
+                for (int i = selectedColorCount; i < 4; i++)
+                {
+                    switch (i)
+                    {
+                    case 0:
+                        colorName1 = "NA";
+                        break;
+                    case 1:
+                        colorName2 = "NA";
+                        break;
+                    case 2:
+                        colorName3 = "NA";
+                        break;
+                    case 3:
+                        colorName4 = "NA";
+                        break;
+                    }
+                }
+            }
+            // Send the pattern data to the Raspberry Pi
+            myUserData.updateData(brightnessString, patternName, colorName1, colorName2, colorName3, colorName4);
+            myUserData.sendPattern();
+
             userFinished = true;
             currentState = OFF;
             lcd.clear();
             lcd.setCursor(4, 0);
-            lcd.print("Sending");
-            lcd.setCursor(3, 1);
-            lcd.print("Request...");
-
-            if (selectedColorCount == 0)
-            {
-                colorName1 = "NA";
-                colorName2 = "NA";
-                colorName3 = "NA";
-                colorName4 = "NA";
-            }
-            else if (selectedColorCount == 1)
-            {
-                colorName2 = "NA";
-                colorName3 = "NA";
-                colorName4 = "NA";
-            }
-            else if (selectedColorCount == 2)
-            {
-                colorName3 = "NA";
-                colorName4 = "NA";
-            }
-            else if (selectedColorCount == 3)
-            {
-                colorName4 = "NA";
-            }
-
-            // Create an instance of UserData, update it, and print the data
-            UserData userData;
-            brightness = map(potVal1, 0, 1023, 0, 100);
-            bright01 = brightness / 100.;
-            String brightnessString = String(bright01);
-
-            userData.updateData(brightnessString, patternName, colorName1, colorName2, colorName3, colorName4);
-
-            userData.printUserData();
-
-            delay(5000);
+            lcd.print("Request");
+            lcd.setCursor(6, 1);
+            lcd.print("Sent");
+            delay(2000);
             lcd.clear();
         }
         else
         {
             myUserDis.colorDis(analogRead(potPin2), colorCounts[pattIndex]);
         }
-        if (myUserDis.isButtonPressed())
+        if (myUserDis.isButtonPressed()) // If the button is pressed, select the color and update the LCD screen
         {
-            // get color selected string
-            colorIndex = map(analogRead(potPin2), 0, 1023, 0, sizeof(colorNames) / sizeof(colorNames[0]) - 1); // Map the potentiometer value 0-1023 to color index 0-99 (100 colors). Math so if more colors are added the code doesn't need to be changed
+            colorIndex = map(analogRead(potPin2), 0, 1023, 0, sizeof(colorNames) / sizeof(colorNames[0]) - 1); // Map the potentiometer value 0-1023 to color index 0-99 (100 colors)
 
             // Update the corresponding color name based on selectedColorCount
             if (selectedColorCount == 0)
@@ -375,13 +359,12 @@ void loop()
                 colorName4 = reinterpret_cast<const __FlashStringHelper *>(sendColorNames[colorIndex]);
             }
 
-            selectedColorCount++; // Increment selected color count
+            selectedColorCount++; // Increment selected color count to keep track of how many colors have been selected
 
             lcd.setCursor(0, 0);
             lcd.print("Color Selected! ");
-            delay(2000); // Display confirmation message for 2000 milliseconds
+            delay(800); 
         }
         break;
     }
-
 }

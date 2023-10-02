@@ -1,29 +1,34 @@
 from serial_com import SerialCommunication
 from strip import Strip
 import threading 
-class ProgramController:
+
+
+#This is the controller, it connects the serial communication to the strip class and is in charge of running the program
+class ProgramController
     def __init__(self,model:SerialCommunication, strip1:Strip):
+        """Initalize with model (Serial Communicator class) and strip you want (Instance of strip class)"""
         self.model = model
         self.strip1 = strip1
         
     def run_program(self):
+        """This method runs thr program in an infinite loop, utilizes threading to run patterns on the strip while recieving and translating requests from the arduino"""
         mode_data = ['Pattern','Color1','Color2','Color3','Color4','Brightness']
-        self.strip1.flag = 'clear_strip'
-        effect_thread = threading.Thread(target=self.strip1.clear_strip)
-        self.strip1.pixels.show()
-        effect_thread.start()
+        self.strip1.flag = 'clear_strip' #Clears strip upon start up
+        effect_thread = threading.Thread(target=self.strip1.clear_strip) #initializes thread to avoid .join() errors
+        self.strip1.pixels.show() 
+        effect_thread.start()  #starts thread
         print("Program Initialized and Started!")
-        while True:
+        while True: #infinite loop
             mode_data = self.model.get_request() #grabs request 
             print("Controller: Request got!:" , mode_data)
-            mode_data = self.model.translate_request(mode_data)
+            mode_data = self.model.translate_request(mode_data) #transaltes request into something controller can understand and use
             print("Controller: Request translated!", mode_data)
 
-            if mode_data[0] == 'Brightness':
+            if mode_data[0] == 'Brightness': #If the request is a brightness change request, changes brightness
                 self.strip1.pixels.brightness = mode_data[1] #sets strip brightness to input
                 print('Controller: Brightness Changed to:', self.strip1.pixels.brightness)
                 self.strip1.pixels.show()
-            elif mode_data[0] == 'Pattern':
+            elif mode_data[0] == 'Pattern': #if request is pattern change request, changes flag, waits for infitie loop of previous effect to break due to self.flag change (.join()), starts new thread with new effect
                 if mode_data[1] == 'Rainbow':
                     self.strip1.trans_flag = False
                     self.strip1.flag = 'Rainbow_Animation'
@@ -105,7 +110,7 @@ class ProgramController:
                     effect_thread.join()
                     effect_thread = threading.Thread(target=self.strip1.transition_effects)
                     effect_thread.start()
-            else:
-                print('OH fuck')
+            else: #ideally communication errors would be dealt with earlier, but just in case this here
+                print('Something went very wrong!')
 
 
