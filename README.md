@@ -11,7 +11,7 @@ The project consists of an arduino uno connected to several potentiometers allow
 Raspberry pi:
 The strip class consists of all the effects I have programmed using the neopixel library. Many of the workings of these effects take artistic or programming inspiration from the FASTLed library. 
 
-The SerialCom class is the raspberry pi end of the communication with the Arudino, while the controlelr class connects all these different classes together. (This is inspired by the Model View Controller method)
+The SerialCom class is the raspberry pi end of the communication with the Arudino, while the controller class connects all these different classes together. (This is inspired by the Model View Controller method)
 
 The folder labeled "Old Stuff" contains prototype code for an HTTPs server user interface that we orginally planned to use and other code to help us learn and experiment. We decided to not use a web server interface due to dorm wifi security issues. 
 
