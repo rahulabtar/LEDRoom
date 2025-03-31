@@ -1,7 +1,0 @@
-#line 1 "/home/rahul/LEDRoom/ledroom/.vscode/arduino.json"
-{
-    "sketch": "ledroom.ino",
-    "output": "build",
-    "port": "/dev/ttyUSB0",
-    "board": "arduino:avr:unowifi"
-}
